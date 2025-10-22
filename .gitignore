@@ -1,8 +1,8 @@
-.Rproj.user
+.Rproj.user/
 .Rhistory
 .RData
 .Ruserdata
-data/
-outputs/*.rds
+*_files/
+
 data/
 outputs/*.rds
