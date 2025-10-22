@@ -1,0 +1,483 @@
+---
+title: "Adverse Event EDA for {params$drug}"
+author: "Shohn Godboldt"
+format:
+  html:
+    toc: true
+    number-sections: true
+  # pdf: default   # leave commented unless you install LaTeX
+params:
+  drug: "metformin"        # default; can override on render
+  start_date: "2024-01-01" # default
+  end_date: "2024-03-31"   # default
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+
+```{r}
+#| label: setup
+#| include: false
+# Packages
+required <- c("tidyverse","jsonlite","lubridate","janitor","glue","scales")
+to_install <- setdiff(required, rownames(installed.packages()))
+if (length(to_install)) install.packages(to_install, repos = "https://cloud.r-project.org")
+invisible(lapply(required, library, character.only = TRUE))
+
+dir.create("data",    showWarnings = FALSE, recursive = TRUE)
+dir.create("outputs", showWarnings = FALSE, recursive = TRUE)
+
+drug       <- tolower(params$drug)
+start_date <- as.Date(params$start_date)
+end_date   <- as.Date(params$end_date)
+```
+
+## 1. Objective & Business Framing
+
+**Goal.** Use a public healthcare API to practice advisor-style EDA: quantify **adverse events** for a given drug, identify **top reactions**, **age/sex patterns**, **serious outcomes**, and **time trends**.\
+**Why it matters.** Payers and health plans track safety signals to inform care management, member outreach, and provider education.
+
+------------------------------------------------------------------------
+
+## 2. Data Source & Pull (openFDA Drug Event API)
+
+We query: `https://api.fda.gov/drug/event.json` (no key required). We’ll filter by **receivedate** and **drug name**.
+
+```{r}
+#| label: api-utils
+fetch_openfda_page <- function(search, skip = 0, limit = 1000) {
+  base <- "https://api.fda.gov/drug/event.json"
+  url  <- glue("{base}?search={URLencode(search)}&limit={limit}&skip={skip}")
+  tryCatch(jsonlite::fromJSON(url), error = function(e) NULL)
+}
+
+# Robust total estimator (fast probe, then fallback to count endpoint)
+count_openfda <- function(search) {
+  base <- "https://api.fda.gov/drug/event.json"
+  probe_url <- glue("{base}?search={URLencode(search)}&limit=1")
+  res <- tryCatch(jsonlite::fromJSON(probe_url), error = function(e) NULL)
+  tot <- suppressWarnings(as.integer(tryCatch(res$meta$results$total, error = function(e) NA_integer_)))
+  if (!is.na(tot)) return(tot)
+
+  url2 <- glue("{base}?search={URLencode(search)}&count=receivedate")
+  res2 <- tryCatch(jsonlite::fromJSON(url2), error = function(e) NULL)
+  if (is.null(res2) || is.null(res2$results)) return(0L)
+  if (is.data.frame(res2$results) && "count" %in% names(res2$results)) {
+    return(sum(res2$results$count, na.rm = TRUE))
+  }
+  0L
+}
+
+`%||%` <- function(a,b) if (is.null(a)) b else a
+```
+
+```{r}
+#| label: drug-aliases
+alias_terms <- function(drug_in) {
+  d <- tolower(trimws(drug_in))
+  if (d == "semaglutide") {
+    c("semaglutide","ozempic","wegovy","rybelsus")
+  } else if (d == "metformin") {
+    c("metformin","glucophage")
+  } else if (d == "atorvastatin") {
+    c("atorvastatin","lipitor")
+  } else if (d == "amoxicillin") {
+    c("amoxicillin","amoxil")
+  } else {
+    c(d)
+  }
+}
+```
+
+```{r}
+#| label: api-pull
+# ---- Speed knobs (adjust as needed) ----
+MAX_PULL_CAP <- 2500L
+PAGE_LIMIT   <- 500L
+
+# Build search with patient.drug.* and OR'ed generic/brand names
+terms <- alias_terms(drug)
+term_clauses  <- sprintf('patient.drug.medicinalproduct:"%s"', terms)
+term_clauses2 <- c(
+  sprintf('patient.drug.openfda.generic_name:"%s"', toupper(terms)),
+  sprintf('patient.drug.openfda.brand_name:"%s"',   toupper(terms))
+)
+
+drug_query <- paste(c(term_clauses, term_clauses2), collapse = "+OR+")
+q_drug     <- paste0("(", drug_query, ")")
+q_dates    <- glue("receivedate:[{format(start_date, '%Y%m%d')}+TO+{format(end_date, '%Y%m%d')}]")
+
+# Build single-string query (avoid vector/brace issues)
+search <- glue("{q_drug}+AND+{q_dates}")
+search <- paste(search, collapse = " ")
+
+# Count; if zero, broaden dates and retry once
+total_est <- count_openfda(search)
+if (total_est == 0) {
+  start_date <- as.Date("2019-01-01")
+  q_dates    <- glue("receivedate:[{format(start_date, '%Y%m%d')}+TO+{format(end_date, '%Y%m%d')}]")
+  search     <- glue("{q_drug}+AND+{q_dates}")
+  search     <- paste(search, collapse = " ")
+  total_est  <- count_openfda(search)
+}
+if (total_est == 0) stop("No records found after alias + broadened dates. Try another drug or dates.")
+
+# ---- Caching ----
+cache_path <- glue(
+  "data/raw_{drug}_{format(start_date, '%Y%m%d')}_{format(end_date, '%Y%m%d')}_{MAX_PULL_CAP}_{PAGE_LIMIT}.rds"
+)
+
+if (file.exists(cache_path)) {
+  all_results <- readRDS(cache_path)
+
+} else {
+  max_pull <- min(as.integer(total_est), MAX_PULL_CAP)
+  pages    <- ceiling(max_pull / PAGE_LIMIT)
+
+  pull_event_chunk <- function(skip) {
+    base <- "https://api.fda.gov/drug/event.json"
+    url  <- glue("{base}?search={URLencode(search)}&limit={PAGE_LIMIT}&skip={skip}")
+    json <- tryCatch(jsonlite::fromJSON(url), error = function(e) NULL)
+    if (is.null(json) || is.null(json$results)) return(NULL)
+    json$results
+  }
+
+  all_results <- purrr::map(
+      seq(0, by = PAGE_LIMIT, length.out = pages),
+      pull_event_chunk
+    ) |>
+    purrr::compact() |>
+    dplyr::bind_rows()
+
+  saveRDS(all_results, cache_path)
+}
+
+```
+
+------------------------------------------------------------------------
+
+## 3. Normalization & Tidy Model
+
+We unnest to one row per **(safety report × reaction)** with key fields.
+
+The raw openFDA data contains **nested JSON objects**, especially under `patient`, `reaction`, and `drug` fields.  
+This section flattens the data into a **tidy structure**, where each row corresponds to one unique combination of **(safety report × reaction)**.  
+This enables direct use of `dplyr` pipelines and ggplot visualizations later in the report.
+
+```{r}
+#| label: normalize
+# Convert API results to a tibble and keep the patient list-column
+events_raw <- tibble::as_tibble(all_results)
+
+# some payloads have safetyreportid only; others may also have id
+has_id <- "id" %in% names(events_raw)
+
+tidy_events <- events_raw %>%
+  dplyr::transmute(
+    safetyreportid = if (has_id) dplyr::coalesce(safetyreportid, id) else safetyreportid,
+    receivedate    = lubridate::ymd(receivedate),
+    seriousness    = dplyr::coalesce(as.integer(serious), 0L),
+    patient        = patient
+  )
+
+# ---- robust helpers (handle NULL/atomic/weird shapes) ----
+safe_extract_age <- function(p) {
+  if (is.null(p) || is.atomic(p) || length(p) == 0) return(NA_real_)
+  if (inherits(p, "data.frame")) p <- as.list(p)
+  ag   <- tryCatch(p$patientonsetage,     error = function(e) NULL)
+  unit <- tryCatch(p$patientonsetageunit, error = function(e) NULL)
+  if (is.null(ag)) return(NA_real_)
+  ag <- suppressWarnings(as.numeric(ag[1]))
+  if (is.na(ag)) return(NA_real_)
+  if (is.null(unit)) return(ag)
+  unit <- suppressWarnings(as.numeric(unit[1]))
+  if (is.na(unit)) return(ag)
+  if (unit == 801) return(ag * 10)  # decades → years
+  if (unit == 1)   return(ag)       # years
+  ag
+}
+
+safe_extract_sex <- function(p) {
+  if (is.null(p) || is.atomic(p) || length(p) == 0) return(NA_character_)
+  if (inherits(p, "data.frame")) p <- as.list(p)
+  sx <- suppressWarnings(as.integer(tryCatch(p$patientsex, error = function(e) NA_integer_)))
+  dplyr::case_when(
+    is.na(sx) ~ NA_character_,
+    sx == 1   ~ "Male",
+    sx == 2   ~ "Female",
+    TRUE      ~ "Unknown"
+  )
+}
+
+# replaces your existing safe_unwrap_reactions()
+safe_unwrap_reactions <- function(p) {
+  # Always return a tibble with a 'reaction' column (may be NA)
+  if (is.null(p) || is.atomic(p) || length(p) == 0) {
+    return(tibble::tibble(reaction = NA_character_))
+  }
+  rx <- tryCatch(p$reaction, error = function(e) NULL)
+  if (is.null(rx)) return(tibble::tibble(reaction = NA_character_))
+
+  # If it's a list of rows, coerce to a data frame
+  if (is.list(rx) && !is.data.frame(rx)) {
+    rx <- tryCatch(dplyr::bind_rows(rx), error = function(e) rx)
+  }
+
+  # Try several possible column names for the MedDRA PT text
+  candidates <- c(
+    "reactionmeddrapt",        # common
+    "reactionmeddra_pt",       # alt
+    "reactionmeddra",          # rare
+    "reactionmeddrapt_text",   # alt
+    "reactionmeddraversionpt"  # last-resort text-ish
+  )
+  col <- intersect(candidates, names(rx))
+  if (length(col) == 0) return(tibble::tibble(reaction = NA_character_))
+
+  vals <- tolower(as.character(rx[[col[1]]]))
+  vals[vals == ""] <- NA_character_
+  tibble::tibble(reaction = vals)
+}
+safe_unwrap_drugnames <- function(p) {
+  if (is.null(p) || is.atomic(p) || length(p) == 0) return(NA_character_)
+  dr <- tryCatch(p$drug, error = function(e) NULL)
+  if (is.null(dr)) return(NA_character_)
+  prods <- tolower(dr$medicinalproduct)
+  paste(unique(prods[!is.na(prods)]), collapse = "; ")
+}
+
+# ---- build tidy frame safely: rowwise → list-cols → unnest ----
+events_basic <- tidy_events %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(
+    reaction_tbl = list(safe_unwrap_reactions(patient)),  # always a list per row
+    drugnames    = safe_unwrap_drugnames(patient),
+    age_years    = safe_extract_age(patient),
+    sex          = safe_extract_sex(patient)
+  ) %>%
+  dplyr::ungroup() %>%
+  tidyr::unnest(reaction_tbl, keep_empty = TRUE) %>%      # expand to reaction-level rows
+  dplyr::select(-patient)                                 # drop big list-col
+
+# ---- finalize: always create events_final (even if empty) ------------------
+
+make_empty_final <- function() {
+  tibble::tibble(
+    safetyreportid = character(),
+    receivedate    = as.Date(character()),
+    seriousness    = integer(),
+    reaction       = character(),
+    drugnames      = character(),
+    age_years      = numeric(),
+    sex            = character(),
+    age_group      = factor(levels = c("0-17","18-34","35-49","50-64","65-80","80+")),
+    serious_flag   = character()
+  )
+}
+
+if (exists("events_basic") && nrow(events_basic) > 0) {
+  events_final <- events_basic %>%
+    dplyr::mutate(
+      age_group = cut(
+        age_years,
+        breaks = c(-Inf, 17, 34, 49, 64, 80, Inf),
+        labels = c("0-17","18-34","35-49","50-64","65-80","80+")
+      ),
+      serious_flag = dplyr::if_else(seriousness == 1, "Serious", "Non-serious")
+    ) %>%
+    janitor::clean_names()
+
+  if (nrow(events_final) == 0) events_final <- make_empty_final()
+} else {
+  events_final <- make_empty_final()
+}
+
+
+```
+
+------------------------------------------------------------------------
+
+## 4. Descriptive Analytics
+
+This section provides **summary-level insights** into the adverse event data retrieved for the selected drug and time period.  
+The goal is not statistical inference, but to verify that the data pull, normalization, and aggregation pipelines are functioning correctly.  
+Each subsection below demonstrates a distinct analytical transformation — coverage metrics, reaction frequencies, and basic visualization.
+
+
+
+### 4.1 Volume & coverage
+
+We begin by reviewing how many unique safety reports were collected, how many rows remain after unnesting reactions,  
+and the date range covered by the dataset. This helps confirm that the API pull retrieved meaningful results and the normalization worked as intended.
+
+```{r}
+#| label: coverage
+n_events <- dplyr::n_distinct(events_final$safetyreportid)
+n_rows   <- nrow(events_final)
+date_rng <- range(events_final$receivedate, na.rm = TRUE)
+tibble(metric = c("unique_reports","rows_after_unnest","date_min","date_max"),
+       value  = c(n_events, n_rows, as.character(date_rng[1]), as.character(date_rng[2]))) |>
+  knitr::kable()
+```
+
+### 4.2 Top reactions (Pareto)
+
+To identify which adverse events are most commonly reported, we count reaction terms and rank them by frequency.  
+The **Pareto principle (80/20 rule)** often applies in pharmacovigilance data — a small subset of reactions usually accounts for the majority of reports.  
+Below, we display the top reported reaction terms as both a table and a visualization.
+
+### Visulizations and Top Reactions 
+The following Pareto-style bar chart visualizes the most frequently reported reactions for the selected drug.  
+This confirms that plotting and file export are functioning as expected.  
+Each figure is automatically saved to the `outputs/` directory for reproducibility.
+
+```{r}
+#| label: top-reactions
+top_rx <- events_final |>
+  dplyr::filter(!is.na(reaction)) |>
+  dplyr::count(reaction, sort = TRUE) |>
+  dplyr::mutate(pct = n / sum(n))
+
+head(top_rx, 20) |>
+  knitr::kable()
+```
+
+```{r}
+#| label: plot-reactions
+#| fig-width: 7
+#| fig-height: 5
+top_rx %>%
+  dplyr::slice_head(n = 15) %>%
+  dplyr::mutate(reaction = forcats::fct_reorder(reaction, n)) %>%
+  ggplot2::ggplot(ggplot2::aes(reaction, n)) +
+  ggplot2::geom_col() +
+  ggplot2::coord_flip() +
+  ggplot2::scale_y_continuous(labels = scales::comma) +
+  ggplot2::labs(title = glue("Top Adverse Reactions for {stringr::str_to_title(drug)}"),
+       x = NULL, y = "Reports")
+ggplot2::ggsave(glue("outputs/top_reactions_{drug}.png"), width = 7, height = 5, dpi = 300)
+```
+
+### 4.3 Age × Sex pattern
+
+
+Adverse event reporting can vary by **age** and **biological sex**, often revealing demographic usage or susceptibility trends.  
+This section summarizes reports by age group and sex, giving a simple population-level snapshot.
+
+The table below shows the count and percentage of reports by age group and sex.
+```{r}
+#| label: age-sex
+age_sex <- events_final |>
+  dplyr::filter(!is.na(age_group), sex %in% c("Male","Female")) |>
+  dplyr::count(age_group, sex, sort = TRUE) |>
+  dplyr::group_by(sex) |>
+  dplyr::mutate(pct = n / sum(n)) |>
+  dplyr::ungroup()
+
+knitr::kable(age_sex)
+```
+
+#### Visualization: Age × Sex Pattern
+
+The following grouped bar chart shows how report counts differ across age categories and between male and female patients.  
+This quick visual verification helps confirm the dataset’s demographic spread and that unnesting produced valid age/sex data.
+
+```{r}
+#| label: plot-age-sex
+#| fig-width: 7
+#| fig-height: 5
+age_sex %>%
+  ggplot2::ggplot(ggplot2::aes(age_group, n, fill = sex)) +
+  ggplot2::geom_col(position = "dodge") +
+  ggplot2::labs(title = glue("{stringr::str_to_title(drug)}: Reports by Age Group and Sex"),
+       x = "Age Group", y = "Reports") +
+  ggplot2::guides(fill = ggplot2::guide_legend(title = "Sex"))
+ggplot2::ggsave(glue("outputs/age_sex_{drug}.png"), width = 7, height = 5, dpi = 300)
+```
+
+### 4.4 Serious vs non-serious outcomes
+
+Each record is tagged with a seriousness flag (`1 = serious`, `0 = non-serious`).  
+This summary shows the overall distribution of event severity, providing a sense of case seriousness for the chosen drug.
+
+The table below displays both counts and percentages.
+
+```{r}
+#| label: serious
+serious_tbl <- events_final |>
+  dplyr::count(serious_flag) |>
+  dplyr::mutate(pct = scales::percent(n / sum(n)))
+
+knitr::kable(serious_tbl)
+```
+
+### 4.5 Time trend
+To verify temporal coverage and reporting consistency, we plot the number of received reports per month.  
+This also serves as a quick validation that the `receivedate` field parsed correctly as dates.
+```{r}
+#| label: trend
+trend <- events_final |>
+  dplyr::mutate(month = lubridate::floor_date(receivedate, "month")) |>
+  dplyr::count(month, name = "reports")
+
+knitr::kable(head(trend, 12))
+```
+
+#### Visualization: Monthly Adverse Event Reports
+
+The following line plot visualizes the monthly count of adverse event reports.  
+This ensures that the `receivedate` field was parsed correctly and that the reporting pattern is stable across months.
+
+```{r}
+#| label: plot-trend
+#| fig-width: 7
+#| fig-height: 4
+trend %>%
+  ggplot2::ggplot(ggplot2::aes(month, reports)) +
+  ggplot2::geom_line() +
+  ggplot2::scale_y_continuous(labels = scales::comma) +
+  ggplot2::labs(title = glue("{stringr::str_to_title(drug)}: Monthly Adverse Event Reports"),
+       x = NULL, y = "Reports")
+ggplot2::ggsave(glue("outputs/trend_{drug}.png"), width = 7, height = 4, dpi = 300)
+```
+
+------------------------------------------------------------------------
+
+## 5. Summary & Recommendations
+
+The summary below consolidates all key results derived from the exploratory analysis.  
+It highlights the drug being studied, its data coverage window, top reported reactions, and the proportion of serious outcomes.  
+This section confirms that all analytical components — data pull, normalization, summarization, and visualization — functioned correctly from end to end.
+
+```{r}
+#| label: summary-text
+top3 <- top_rx |> dplyr::slice_head(n = 3) |> dplyr::pull(reaction) |> stringr::str_to_title() |> paste(collapse = ", ")
+peak_month <- trend |> dplyr::slice_max(reports, n = 1) |> dplyr::pull(month)
+
+summary_txt <- glue::glue("
+**Key Findings (Drug:** {stringr::str_to_title(drug)} **; Window:** {start_date} → {end_date}**)**  
+• **Top reactions:** {top3}.  
+• **Serious outcomes:** {serious_tbl |> dplyr::filter(serious_flag=='Serious') |> dplyr::pull(pct)} of reports marked serious.  
+• **Demographics:** See age×sex chart; consider targeted member education if skewed.  
+• **Utilization trend:** Peak reporting month ~ {format(peak_month, '%Y-%m')}.
+")
+
+cat(summary_txt)
+writeLines(summary_txt, glue("outputs/summary_{drug}.md"))
+```
+
+## 6. Final Summary
+
+This exploratory analysis successfully demonstrated a complete **end-to-end workflow** using R and Quarto to access, clean, and visualize real-world adverse event data from the openFDA API.  
+
+Through a sequence of structured transformations — API retrieval, normalization, and visualization — the pipeline validated the following:
+
+- Reliable API connection and controlled data pull via parameterized queries.  
+- Consistent data wrangling and normalization with robust handling of missing or nested fields.  
+- Generation of interpretable summaries, including top reactions, demographic trends, and seriousness proportions.  
+- Automated, reproducible visualizations saved to the project’s `outputs/` directory.  
+
+This confirms that the system functions as an adaptable template for pharmacovigilance data analysis, suitable for scaling to other drugs or time windows by simply changing the input parameters.
+

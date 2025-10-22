@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.5.57">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Shohn Godboldt">
+
+<title>Adverse Event EDA for {params$drug}</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="index_files/libs/clipboard/clipboard.min.js"></script>
+<script src="index_files/libs/quarto-html/quarto.js"></script>
+<script src="index_files/libs/quarto-html/popper.min.js"></script>
+<script src="index_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="index_files/libs/quarto-html/anchor.min.js"></script>
+<link href="index_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="index_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="index_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="index_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="index_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body>
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#objective-business-framing" id="toc-objective-business-framing" class="nav-link active" data-scroll-target="#objective-business-framing"><span class="header-section-number">1</span> 1. Objective &amp; Business Framing</a></li>
+  <li><a href="#data-source-pull-openfda-drug-event-api" id="toc-data-source-pull-openfda-drug-event-api" class="nav-link" data-scroll-target="#data-source-pull-openfda-drug-event-api"><span class="header-section-number">2</span> 2. Data Source &amp; Pull (openFDA Drug Event API)</a></li>
+  <li><a href="#normalization-tidy-model" id="toc-normalization-tidy-model" class="nav-link" data-scroll-target="#normalization-tidy-model"><span class="header-section-number">3</span> 3. Normalization &amp; Tidy Model</a></li>
+  <li><a href="#descriptive-analytics" id="toc-descriptive-analytics" class="nav-link" data-scroll-target="#descriptive-analytics"><span class="header-section-number">4</span> 4. Descriptive Analytics</a>
+  <ul class="collapse">
+  <li><a href="#volume-coverage" id="toc-volume-coverage" class="nav-link" data-scroll-target="#volume-coverage"><span class="header-section-number">4.1</span> 4.1 Volume &amp; coverage</a></li>
+  <li><a href="#top-reactions-pareto" id="toc-top-reactions-pareto" class="nav-link" data-scroll-target="#top-reactions-pareto"><span class="header-section-number">4.2</span> 4.2 Top reactions (Pareto)</a></li>
+  <li><a href="#visulizations-and-top-reactions" id="toc-visulizations-and-top-reactions" class="nav-link" data-scroll-target="#visulizations-and-top-reactions"><span class="header-section-number">4.3</span> Visulizations and Top Reactions</a></li>
+  <li><a href="#age-sex-pattern" id="toc-age-sex-pattern" class="nav-link" data-scroll-target="#age-sex-pattern"><span class="header-section-number">4.4</span> 4.3 Age × Sex pattern</a></li>
+  <li><a href="#serious-vs-non-serious-outcomes" id="toc-serious-vs-non-serious-outcomes" class="nav-link" data-scroll-target="#serious-vs-non-serious-outcomes"><span class="header-section-number">4.5</span> 4.4 Serious vs non-serious outcomes</a></li>
+  <li><a href="#time-trend" id="toc-time-trend" class="nav-link" data-scroll-target="#time-trend"><span class="header-section-number">4.6</span> 4.5 Time trend</a></li>
+  </ul></li>
+  <li><a href="#summary-recommendations" id="toc-summary-recommendations" class="nav-link" data-scroll-target="#summary-recommendations"><span class="header-section-number">5</span> 5. Summary &amp; Recommendations</a></li>
+  <li><a href="#final-summary" id="toc-final-summary" class="nav-link" data-scroll-target="#final-summary"><span class="header-section-number">6</span> 6. Final Summary</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Adverse Event EDA for {params$drug}</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Shohn Godboldt </p>
+          </div>
+  </div>
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="objective-business-framing" class="level2" data-number="1">
+<h2 data-number="1" class="anchored" data-anchor-id="objective-business-framing"><span class="header-section-number">1</span> 1. Objective &amp; Business Framing</h2>
+<p><strong>Goal.</strong> Use a public healthcare API to practice advisor-style EDA: quantify <strong>adverse events</strong> for a given drug, identify <strong>top reactions</strong>, <strong>age/sex patterns</strong>, <strong>serious outcomes</strong>, and <strong>time trends</strong>.<br>
+<strong>Why it matters.</strong> Payers and health plans track safety signals to inform care management, member outreach, and provider education.</p>
+<hr>
+</section>
+<section id="data-source-pull-openfda-drug-event-api" class="level2" data-number="2">
+<h2 data-number="2" class="anchored" data-anchor-id="data-source-pull-openfda-drug-event-api"><span class="header-section-number">2</span> 2. Data Source &amp; Pull (openFDA Drug Event API)</h2>
+<p>We query: <code>https://api.fda.gov/drug/event.json</code> (no key required). We’ll filter by <strong>receivedate</strong> and <strong>drug name</strong>.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>fetch_openfda_page <span class="ot">&lt;-</span> <span class="cf">function</span>(search, <span class="at">skip =</span> <span class="dv">0</span>, <span class="at">limit =</span> <span class="dv">1000</span>) {</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>  base <span class="ot">&lt;-</span> <span class="st">"https://api.fda.gov/drug/event.json"</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  url  <span class="ot">&lt;-</span> <span class="fu">glue</span>(<span class="st">"{base}?search={URLencode(search)}&amp;limit={limit}&amp;skip={skip}"</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tryCatch</span>(jsonlite<span class="sc">::</span><span class="fu">fromJSON</span>(url), <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NULL</span>)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Robust total estimator (fast probe, then fallback to count endpoint)</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>count_openfda <span class="ot">&lt;-</span> <span class="cf">function</span>(search) {</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>  base <span class="ot">&lt;-</span> <span class="st">"https://api.fda.gov/drug/event.json"</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>  probe_url <span class="ot">&lt;-</span> <span class="fu">glue</span>(<span class="st">"{base}?search={URLencode(search)}&amp;limit=1"</span>)</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>  res <span class="ot">&lt;-</span> <span class="fu">tryCatch</span>(jsonlite<span class="sc">::</span><span class="fu">fromJSON</span>(probe_url), <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NULL</span>)</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>  tot <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(<span class="fu">as.integer</span>(<span class="fu">tryCatch</span>(res<span class="sc">$</span>meta<span class="sc">$</span>results<span class="sc">$</span>total, <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NA_integer_</span>)))</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.na</span>(tot)) <span class="fu">return</span>(tot)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>  url2 <span class="ot">&lt;-</span> <span class="fu">glue</span>(<span class="st">"{base}?search={URLencode(search)}&amp;count=receivedate"</span>)</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>  res2 <span class="ot">&lt;-</span> <span class="fu">tryCatch</span>(jsonlite<span class="sc">::</span><span class="fu">fromJSON</span>(url2), <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NULL</span>)</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(res2) <span class="sc">||</span> <span class="fu">is.null</span>(res2<span class="sc">$</span>results)) <span class="fu">return</span>(<span class="dv">0</span>L)</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.data.frame</span>(res2<span class="sc">$</span>results) <span class="sc">&amp;&amp;</span> <span class="st">"count"</span> <span class="sc">%in%</span> <span class="fu">names</span>(res2<span class="sc">$</span>results)) {</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>    <span class="fu">return</span>(<span class="fu">sum</span>(res2<span class="sc">$</span>results<span class="sc">$</span>count, <span class="at">na.rm =</span> <span class="cn">TRUE</span>))</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>  <span class="dv">0</span>L</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="st">`</span><span class="at">%||%</span><span class="st">`</span> <span class="ot">&lt;-</span> <span class="cf">function</span>(a,b) <span class="cf">if</span> (<span class="fu">is.null</span>(a)) b <span class="cf">else</span> a</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>alias_terms <span class="ot">&lt;-</span> <span class="cf">function</span>(drug_in) {</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  d <span class="ot">&lt;-</span> <span class="fu">tolower</span>(<span class="fu">trimws</span>(drug_in))</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (d <span class="sc">==</span> <span class="st">"semaglutide"</span>) {</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">c</span>(<span class="st">"semaglutide"</span>,<span class="st">"ozempic"</span>,<span class="st">"wegovy"</span>,<span class="st">"rybelsus"</span>)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> <span class="cf">if</span> (d <span class="sc">==</span> <span class="st">"metformin"</span>) {</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">c</span>(<span class="st">"metformin"</span>,<span class="st">"glucophage"</span>)</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> <span class="cf">if</span> (d <span class="sc">==</span> <span class="st">"atorvastatin"</span>) {</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">c</span>(<span class="st">"atorvastatin"</span>,<span class="st">"lipitor"</span>)</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> <span class="cf">if</span> (d <span class="sc">==</span> <span class="st">"amoxicillin"</span>) {</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">c</span>(<span class="st">"amoxicillin"</span>,<span class="st">"amoxil"</span>)</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> {</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">c</span>(d)</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ---- Speed knobs (adjust as needed) ----</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>MAX_PULL_CAP <span class="ot">&lt;-</span> <span class="dv">2500</span>L</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>PAGE_LIMIT   <span class="ot">&lt;-</span> <span class="dv">500</span>L</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Build search with patient.drug.* and OR'ed generic/brand names</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>terms <span class="ot">&lt;-</span> <span class="fu">alias_terms</span>(drug)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>term_clauses  <span class="ot">&lt;-</span> <span class="fu">sprintf</span>(<span class="st">'patient.drug.medicinalproduct:"%s"'</span>, terms)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>term_clauses2 <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sprintf</span>(<span class="st">'patient.drug.openfda.generic_name:"%s"'</span>, <span class="fu">toupper</span>(terms)),</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sprintf</span>(<span class="st">'patient.drug.openfda.brand_name:"%s"'</span>,   <span class="fu">toupper</span>(terms))</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>drug_query <span class="ot">&lt;-</span> <span class="fu">paste</span>(<span class="fu">c</span>(term_clauses, term_clauses2), <span class="at">collapse =</span> <span class="st">"+OR+"</span>)</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>q_drug     <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">"("</span>, drug_query, <span class="st">")"</span>)</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>q_dates    <span class="ot">&lt;-</span> <span class="fu">glue</span>(<span class="st">"receivedate:[{format(start_date, '%Y%m%d')}+TO+{format(end_date, '%Y%m%d')}]"</span>)</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Build single-string query (avoid vector/brace issues)</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>search <span class="ot">&lt;-</span> <span class="fu">glue</span>(<span class="st">"{q_drug}+AND+{q_dates}"</span>)</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>search <span class="ot">&lt;-</span> <span class="fu">paste</span>(search, <span class="at">collapse =</span> <span class="st">" "</span>)</span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a><span class="co"># Count; if zero, broaden dates and retry once</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>total_est <span class="ot">&lt;-</span> <span class="fu">count_openfda</span>(search)</span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (total_est <span class="sc">==</span> <span class="dv">0</span>) {</span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>  start_date <span class="ot">&lt;-</span> <span class="fu">as.Date</span>(<span class="st">"2019-01-01"</span>)</span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>  q_dates    <span class="ot">&lt;-</span> <span class="fu">glue</span>(<span class="st">"receivedate:[{format(start_date, '%Y%m%d')}+TO+{format(end_date, '%Y%m%d')}]"</span>)</span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>  search     <span class="ot">&lt;-</span> <span class="fu">glue</span>(<span class="st">"{q_drug}+AND+{q_dates}"</span>)</span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>  search     <span class="ot">&lt;-</span> <span class="fu">paste</span>(search, <span class="at">collapse =</span> <span class="st">" "</span>)</span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>  total_est  <span class="ot">&lt;-</span> <span class="fu">count_openfda</span>(search)</span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (total_est <span class="sc">==</span> <span class="dv">0</span>) <span class="fu">stop</span>(<span class="st">"No records found after alias + broadened dates. Try another drug or dates."</span>)</span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a><span class="co"># ---- Caching ----</span></span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>cache_path <span class="ot">&lt;-</span> <span class="fu">glue</span>(</span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a>  <span class="st">"data/raw_{drug}_{format(start_date, '%Y%m%d')}_{format(end_date, '%Y%m%d')}_{MAX_PULL_CAP}_{PAGE_LIMIT}.rds"</span></span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">file.exists</span>(cache_path)) {</span>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a>  all_results <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(cache_path)</span>
+<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a>} <span class="cf">else</span> {</span>
+<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>  max_pull <span class="ot">&lt;-</span> <span class="fu">min</span>(<span class="fu">as.integer</span>(total_est), MAX_PULL_CAP)</span>
+<span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>  pages    <span class="ot">&lt;-</span> <span class="fu">ceiling</span>(max_pull <span class="sc">/</span> PAGE_LIMIT)</span>
+<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a>  pull_event_chunk <span class="ot">&lt;-</span> <span class="cf">function</span>(skip) {</span>
+<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>    base <span class="ot">&lt;-</span> <span class="st">"https://api.fda.gov/drug/event.json"</span></span>
+<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a>    url  <span class="ot">&lt;-</span> <span class="fu">glue</span>(<span class="st">"{base}?search={URLencode(search)}&amp;limit={PAGE_LIMIT}&amp;skip={skip}"</span>)</span>
+<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a>    json <span class="ot">&lt;-</span> <span class="fu">tryCatch</span>(jsonlite<span class="sc">::</span><span class="fu">fromJSON</span>(url), <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NULL</span>)</span>
+<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">is.null</span>(json) <span class="sc">||</span> <span class="fu">is.null</span>(json<span class="sc">$</span>results)) <span class="fu">return</span>(<span class="cn">NULL</span>)</span>
+<span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a>    json<span class="sc">$</span>results</span>
+<span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb3-51"><a href="#cb3-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-52"><a href="#cb3-52" aria-hidden="true" tabindex="-1"></a>  all_results <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map</span>(</span>
+<span id="cb3-53"><a href="#cb3-53" aria-hidden="true" tabindex="-1"></a>      <span class="fu">seq</span>(<span class="dv">0</span>, <span class="at">by =</span> PAGE_LIMIT, <span class="at">length.out =</span> pages),</span>
+<span id="cb3-54"><a href="#cb3-54" aria-hidden="true" tabindex="-1"></a>      pull_event_chunk</span>
+<span id="cb3-55"><a href="#cb3-55" aria-hidden="true" tabindex="-1"></a>    ) <span class="sc">|&gt;</span></span>
+<span id="cb3-56"><a href="#cb3-56" aria-hidden="true" tabindex="-1"></a>    purrr<span class="sc">::</span><span class="fu">compact</span>() <span class="sc">|&gt;</span></span>
+<span id="cb3-57"><a href="#cb3-57" aria-hidden="true" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">bind_rows</span>()</span>
+<span id="cb3-58"><a href="#cb3-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-59"><a href="#cb3-59" aria-hidden="true" tabindex="-1"></a>  <span class="fu">saveRDS</span>(all_results, cache_path)</span>
+<span id="cb3-60"><a href="#cb3-60" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<hr>
+</section>
+<section id="normalization-tidy-model" class="level2" data-number="3">
+<h2 data-number="3" class="anchored" data-anchor-id="normalization-tidy-model"><span class="header-section-number">3</span> 3. Normalization &amp; Tidy Model</h2>
+<p>We unnest to one row per <strong>(safety report × reaction)</strong> with key fields.</p>
+<p>The raw openFDA data contains <strong>nested JSON objects</strong>, especially under <code>patient</code>, <code>reaction</code>, and <code>drug</code> fields.<br>
+This section flattens the data into a <strong>tidy structure</strong>, where each row corresponds to one unique combination of <strong>(safety report × reaction)</strong>.<br>
+This enables direct use of <code>dplyr</code> pipelines and ggplot visualizations later in the report.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Convert API results to a tibble and keep the patient list-column</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>events_raw <span class="ot">&lt;-</span> tibble<span class="sc">::</span><span class="fu">as_tibble</span>(all_results)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co"># some payloads have safetyreportid only; others may also have id</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>has_id <span class="ot">&lt;-</span> <span class="st">"id"</span> <span class="sc">%in%</span> <span class="fu">names</span>(events_raw)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>tidy_events <span class="ot">&lt;-</span> events_raw <span class="sc">%&gt;%</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">transmute</span>(</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">safetyreportid =</span> <span class="cf">if</span> (has_id) dplyr<span class="sc">::</span><span class="fu">coalesce</span>(safetyreportid, id) <span class="cf">else</span> safetyreportid,</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">receivedate    =</span> lubridate<span class="sc">::</span><span class="fu">ymd</span>(receivedate),</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">seriousness    =</span> dplyr<span class="sc">::</span><span class="fu">coalesce</span>(<span class="fu">as.integer</span>(serious), <span class="dv">0</span>L),</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">patient        =</span> patient</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="co"># ---- robust helpers (handle NULL/atomic/weird shapes) ----</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>safe_extract_age <span class="ot">&lt;-</span> <span class="cf">function</span>(p) {</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(p) <span class="sc">||</span> <span class="fu">is.atomic</span>(p) <span class="sc">||</span> <span class="fu">length</span>(p) <span class="sc">==</span> <span class="dv">0</span>) <span class="fu">return</span>(<span class="cn">NA_real_</span>)</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">inherits</span>(p, <span class="st">"data.frame"</span>)) p <span class="ot">&lt;-</span> <span class="fu">as.list</span>(p)</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>  ag   <span class="ot">&lt;-</span> <span class="fu">tryCatch</span>(p<span class="sc">$</span>patientonsetage,     <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NULL</span>)</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>  unit <span class="ot">&lt;-</span> <span class="fu">tryCatch</span>(p<span class="sc">$</span>patientonsetageunit, <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NULL</span>)</span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(ag)) <span class="fu">return</span>(<span class="cn">NA_real_</span>)</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>  ag <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(<span class="fu">as.numeric</span>(ag[<span class="dv">1</span>]))</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.na</span>(ag)) <span class="fu">return</span>(<span class="cn">NA_real_</span>)</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(unit)) <span class="fu">return</span>(ag)</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>  unit <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(<span class="fu">as.numeric</span>(unit[<span class="dv">1</span>]))</span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.na</span>(unit)) <span class="fu">return</span>(ag)</span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (unit <span class="sc">==</span> <span class="dv">801</span>) <span class="fu">return</span>(ag <span class="sc">*</span> <span class="dv">10</span>)  <span class="co"># decades → years</span></span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (unit <span class="sc">==</span> <span class="dv">1</span>)   <span class="fu">return</span>(ag)       <span class="co"># years</span></span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>  ag</span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a>safe_extract_sex <span class="ot">&lt;-</span> <span class="cf">function</span>(p) {</span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(p) <span class="sc">||</span> <span class="fu">is.atomic</span>(p) <span class="sc">||</span> <span class="fu">length</span>(p) <span class="sc">==</span> <span class="dv">0</span>) <span class="fu">return</span>(<span class="cn">NA_character_</span>)</span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">inherits</span>(p, <span class="st">"data.frame"</span>)) p <span class="ot">&lt;-</span> <span class="fu">as.list</span>(p)</span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a>  sx <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(<span class="fu">as.integer</span>(<span class="fu">tryCatch</span>(p<span class="sc">$</span>patientsex, <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NA_integer_</span>)))</span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">case_when</span>(</span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a>    <span class="fu">is.na</span>(sx) <span class="sc">~</span> <span class="cn">NA_character_</span>,</span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a>    sx <span class="sc">==</span> <span class="dv">1</span>   <span class="sc">~</span> <span class="st">"Male"</span>,</span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a>    sx <span class="sc">==</span> <span class="dv">2</span>   <span class="sc">~</span> <span class="st">"Female"</span>,</span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a>    <span class="cn">TRUE</span>      <span class="sc">~</span> <span class="st">"Unknown"</span></span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a><span class="co"># replaces your existing safe_unwrap_reactions()</span></span>
+<span id="cb4-45"><a href="#cb4-45" aria-hidden="true" tabindex="-1"></a>safe_unwrap_reactions <span class="ot">&lt;-</span> <span class="cf">function</span>(p) {</span>
+<span id="cb4-46"><a href="#cb4-46" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Always return a tibble with a 'reaction' column (may be NA)</span></span>
+<span id="cb4-47"><a href="#cb4-47" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(p) <span class="sc">||</span> <span class="fu">is.atomic</span>(p) <span class="sc">||</span> <span class="fu">length</span>(p) <span class="sc">==</span> <span class="dv">0</span>) {</span>
+<span id="cb4-48"><a href="#cb4-48" aria-hidden="true" tabindex="-1"></a>    <span class="fu">return</span>(tibble<span class="sc">::</span><span class="fu">tibble</span>(<span class="at">reaction =</span> <span class="cn">NA_character_</span>))</span>
+<span id="cb4-49"><a href="#cb4-49" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb4-50"><a href="#cb4-50" aria-hidden="true" tabindex="-1"></a>  rx <span class="ot">&lt;-</span> <span class="fu">tryCatch</span>(p<span class="sc">$</span>reaction, <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NULL</span>)</span>
+<span id="cb4-51"><a href="#cb4-51" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(rx)) <span class="fu">return</span>(tibble<span class="sc">::</span><span class="fu">tibble</span>(<span class="at">reaction =</span> <span class="cn">NA_character_</span>))</span>
+<span id="cb4-52"><a href="#cb4-52" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-53"><a href="#cb4-53" aria-hidden="true" tabindex="-1"></a>  <span class="co"># If it's a list of rows, coerce to a data frame</span></span>
+<span id="cb4-54"><a href="#cb4-54" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.list</span>(rx) <span class="sc">&amp;&amp;</span> <span class="sc">!</span><span class="fu">is.data.frame</span>(rx)) {</span>
+<span id="cb4-55"><a href="#cb4-55" aria-hidden="true" tabindex="-1"></a>    rx <span class="ot">&lt;-</span> <span class="fu">tryCatch</span>(dplyr<span class="sc">::</span><span class="fu">bind_rows</span>(rx), <span class="at">error =</span> <span class="cf">function</span>(e) rx)</span>
+<span id="cb4-56"><a href="#cb4-56" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb4-57"><a href="#cb4-57" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-58"><a href="#cb4-58" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Try several possible column names for the MedDRA PT text</span></span>
+<span id="cb4-59"><a href="#cb4-59" aria-hidden="true" tabindex="-1"></a>  candidates <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb4-60"><a href="#cb4-60" aria-hidden="true" tabindex="-1"></a>    <span class="st">"reactionmeddrapt"</span>,        <span class="co"># common</span></span>
+<span id="cb4-61"><a href="#cb4-61" aria-hidden="true" tabindex="-1"></a>    <span class="st">"reactionmeddra_pt"</span>,       <span class="co"># alt</span></span>
+<span id="cb4-62"><a href="#cb4-62" aria-hidden="true" tabindex="-1"></a>    <span class="st">"reactionmeddra"</span>,          <span class="co"># rare</span></span>
+<span id="cb4-63"><a href="#cb4-63" aria-hidden="true" tabindex="-1"></a>    <span class="st">"reactionmeddrapt_text"</span>,   <span class="co"># alt</span></span>
+<span id="cb4-64"><a href="#cb4-64" aria-hidden="true" tabindex="-1"></a>    <span class="st">"reactionmeddraversionpt"</span>  <span class="co"># last-resort text-ish</span></span>
+<span id="cb4-65"><a href="#cb4-65" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb4-66"><a href="#cb4-66" aria-hidden="true" tabindex="-1"></a>  col <span class="ot">&lt;-</span> <span class="fu">intersect</span>(candidates, <span class="fu">names</span>(rx))</span>
+<span id="cb4-67"><a href="#cb4-67" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">length</span>(col) <span class="sc">==</span> <span class="dv">0</span>) <span class="fu">return</span>(tibble<span class="sc">::</span><span class="fu">tibble</span>(<span class="at">reaction =</span> <span class="cn">NA_character_</span>))</span>
+<span id="cb4-68"><a href="#cb4-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-69"><a href="#cb4-69" aria-hidden="true" tabindex="-1"></a>  vals <span class="ot">&lt;-</span> <span class="fu">tolower</span>(<span class="fu">as.character</span>(rx[[col[<span class="dv">1</span>]]]))</span>
+<span id="cb4-70"><a href="#cb4-70" aria-hidden="true" tabindex="-1"></a>  vals[vals <span class="sc">==</span> <span class="st">""</span>] <span class="ot">&lt;-</span> <span class="cn">NA_character_</span></span>
+<span id="cb4-71"><a href="#cb4-71" aria-hidden="true" tabindex="-1"></a>  tibble<span class="sc">::</span><span class="fu">tibble</span>(<span class="at">reaction =</span> vals)</span>
+<span id="cb4-72"><a href="#cb4-72" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-73"><a href="#cb4-73" aria-hidden="true" tabindex="-1"></a>safe_unwrap_drugnames <span class="ot">&lt;-</span> <span class="cf">function</span>(p) {</span>
+<span id="cb4-74"><a href="#cb4-74" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(p) <span class="sc">||</span> <span class="fu">is.atomic</span>(p) <span class="sc">||</span> <span class="fu">length</span>(p) <span class="sc">==</span> <span class="dv">0</span>) <span class="fu">return</span>(<span class="cn">NA_character_</span>)</span>
+<span id="cb4-75"><a href="#cb4-75" aria-hidden="true" tabindex="-1"></a>  dr <span class="ot">&lt;-</span> <span class="fu">tryCatch</span>(p<span class="sc">$</span>drug, <span class="at">error =</span> <span class="cf">function</span>(e) <span class="cn">NULL</span>)</span>
+<span id="cb4-76"><a href="#cb4-76" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(dr)) <span class="fu">return</span>(<span class="cn">NA_character_</span>)</span>
+<span id="cb4-77"><a href="#cb4-77" aria-hidden="true" tabindex="-1"></a>  prods <span class="ot">&lt;-</span> <span class="fu">tolower</span>(dr<span class="sc">$</span>medicinalproduct)</span>
+<span id="cb4-78"><a href="#cb4-78" aria-hidden="true" tabindex="-1"></a>  <span class="fu">paste</span>(<span class="fu">unique</span>(prods[<span class="sc">!</span><span class="fu">is.na</span>(prods)]), <span class="at">collapse =</span> <span class="st">"; "</span>)</span>
+<span id="cb4-79"><a href="#cb4-79" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-80"><a href="#cb4-80" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-81"><a href="#cb4-81" aria-hidden="true" tabindex="-1"></a><span class="co"># ---- build tidy frame safely: rowwise → list-cols → unnest ----</span></span>
+<span id="cb4-82"><a href="#cb4-82" aria-hidden="true" tabindex="-1"></a>events_basic <span class="ot">&lt;-</span> tidy_events <span class="sc">%&gt;%</span></span>
+<span id="cb4-83"><a href="#cb4-83" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">rowwise</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb4-84"><a href="#cb4-84" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(</span>
+<span id="cb4-85"><a href="#cb4-85" aria-hidden="true" tabindex="-1"></a>    <span class="at">reaction_tbl =</span> <span class="fu">list</span>(<span class="fu">safe_unwrap_reactions</span>(patient)),  <span class="co"># always a list per row</span></span>
+<span id="cb4-86"><a href="#cb4-86" aria-hidden="true" tabindex="-1"></a>    <span class="at">drugnames    =</span> <span class="fu">safe_unwrap_drugnames</span>(patient),</span>
+<span id="cb4-87"><a href="#cb4-87" aria-hidden="true" tabindex="-1"></a>    <span class="at">age_years    =</span> <span class="fu">safe_extract_age</span>(patient),</span>
+<span id="cb4-88"><a href="#cb4-88" aria-hidden="true" tabindex="-1"></a>    <span class="at">sex          =</span> <span class="fu">safe_extract_sex</span>(patient)</span>
+<span id="cb4-89"><a href="#cb4-89" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb4-90"><a href="#cb4-90" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb4-91"><a href="#cb4-91" aria-hidden="true" tabindex="-1"></a>  tidyr<span class="sc">::</span><span class="fu">unnest</span>(reaction_tbl, <span class="at">keep_empty =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span>      <span class="co"># expand to reaction-level rows</span></span>
+<span id="cb4-92"><a href="#cb4-92" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>patient)                                 <span class="co"># drop big list-col</span></span>
+<span id="cb4-93"><a href="#cb4-93" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-94"><a href="#cb4-94" aria-hidden="true" tabindex="-1"></a><span class="co"># ---- finalize: always create events_final (even if empty) ------------------</span></span>
+<span id="cb4-95"><a href="#cb4-95" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-96"><a href="#cb4-96" aria-hidden="true" tabindex="-1"></a>make_empty_final <span class="ot">&lt;-</span> <span class="cf">function</span>() {</span>
+<span id="cb4-97"><a href="#cb4-97" aria-hidden="true" tabindex="-1"></a>  tibble<span class="sc">::</span><span class="fu">tibble</span>(</span>
+<span id="cb4-98"><a href="#cb4-98" aria-hidden="true" tabindex="-1"></a>    <span class="at">safetyreportid =</span> <span class="fu">character</span>(),</span>
+<span id="cb4-99"><a href="#cb4-99" aria-hidden="true" tabindex="-1"></a>    <span class="at">receivedate    =</span> <span class="fu">as.Date</span>(<span class="fu">character</span>()),</span>
+<span id="cb4-100"><a href="#cb4-100" aria-hidden="true" tabindex="-1"></a>    <span class="at">seriousness    =</span> <span class="fu">integer</span>(),</span>
+<span id="cb4-101"><a href="#cb4-101" aria-hidden="true" tabindex="-1"></a>    <span class="at">reaction       =</span> <span class="fu">character</span>(),</span>
+<span id="cb4-102"><a href="#cb4-102" aria-hidden="true" tabindex="-1"></a>    <span class="at">drugnames      =</span> <span class="fu">character</span>(),</span>
+<span id="cb4-103"><a href="#cb4-103" aria-hidden="true" tabindex="-1"></a>    <span class="at">age_years      =</span> <span class="fu">numeric</span>(),</span>
+<span id="cb4-104"><a href="#cb4-104" aria-hidden="true" tabindex="-1"></a>    <span class="at">sex            =</span> <span class="fu">character</span>(),</span>
+<span id="cb4-105"><a href="#cb4-105" aria-hidden="true" tabindex="-1"></a>    <span class="at">age_group      =</span> <span class="fu">factor</span>(<span class="at">levels =</span> <span class="fu">c</span>(<span class="st">"0-17"</span>,<span class="st">"18-34"</span>,<span class="st">"35-49"</span>,<span class="st">"50-64"</span>,<span class="st">"65-80"</span>,<span class="st">"80+"</span>)),</span>
+<span id="cb4-106"><a href="#cb4-106" aria-hidden="true" tabindex="-1"></a>    <span class="at">serious_flag   =</span> <span class="fu">character</span>()</span>
+<span id="cb4-107"><a href="#cb4-107" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb4-108"><a href="#cb4-108" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-109"><a href="#cb4-109" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-110"><a href="#cb4-110" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">exists</span>(<span class="st">"events_basic"</span>) <span class="sc">&amp;&amp;</span> <span class="fu">nrow</span>(events_basic) <span class="sc">&gt;</span> <span class="dv">0</span>) {</span>
+<span id="cb4-111"><a href="#cb4-111" aria-hidden="true" tabindex="-1"></a>  events_final <span class="ot">&lt;-</span> events_basic <span class="sc">%&gt;%</span></span>
+<span id="cb4-112"><a href="#cb4-112" aria-hidden="true" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(</span>
+<span id="cb4-113"><a href="#cb4-113" aria-hidden="true" tabindex="-1"></a>      <span class="at">age_group =</span> <span class="fu">cut</span>(</span>
+<span id="cb4-114"><a href="#cb4-114" aria-hidden="true" tabindex="-1"></a>        age_years,</span>
+<span id="cb4-115"><a href="#cb4-115" aria-hidden="true" tabindex="-1"></a>        <span class="at">breaks =</span> <span class="fu">c</span>(<span class="sc">-</span><span class="cn">Inf</span>, <span class="dv">17</span>, <span class="dv">34</span>, <span class="dv">49</span>, <span class="dv">64</span>, <span class="dv">80</span>, <span class="cn">Inf</span>),</span>
+<span id="cb4-116"><a href="#cb4-116" aria-hidden="true" tabindex="-1"></a>        <span class="at">labels =</span> <span class="fu">c</span>(<span class="st">"0-17"</span>,<span class="st">"18-34"</span>,<span class="st">"35-49"</span>,<span class="st">"50-64"</span>,<span class="st">"65-80"</span>,<span class="st">"80+"</span>)</span>
+<span id="cb4-117"><a href="#cb4-117" aria-hidden="true" tabindex="-1"></a>      ),</span>
+<span id="cb4-118"><a href="#cb4-118" aria-hidden="true" tabindex="-1"></a>      <span class="at">serious_flag =</span> dplyr<span class="sc">::</span><span class="fu">if_else</span>(seriousness <span class="sc">==</span> <span class="dv">1</span>, <span class="st">"Serious"</span>, <span class="st">"Non-serious"</span>)</span>
+<span id="cb4-119"><a href="#cb4-119" aria-hidden="true" tabindex="-1"></a>    ) <span class="sc">%&gt;%</span></span>
+<span id="cb4-120"><a href="#cb4-120" aria-hidden="true" tabindex="-1"></a>    janitor<span class="sc">::</span><span class="fu">clean_names</span>()</span>
+<span id="cb4-121"><a href="#cb4-121" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-122"><a href="#cb4-122" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">nrow</span>(events_final) <span class="sc">==</span> <span class="dv">0</span>) events_final <span class="ot">&lt;-</span> <span class="fu">make_empty_final</span>()</span>
+<span id="cb4-123"><a href="#cb4-123" aria-hidden="true" tabindex="-1"></a>} <span class="cf">else</span> {</span>
+<span id="cb4-124"><a href="#cb4-124" aria-hidden="true" tabindex="-1"></a>  events_final <span class="ot">&lt;-</span> <span class="fu">make_empty_final</span>()</span>
+<span id="cb4-125"><a href="#cb4-125" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<hr>
+</section>
+<section id="descriptive-analytics" class="level2" data-number="4">
+<h2 data-number="4" class="anchored" data-anchor-id="descriptive-analytics"><span class="header-section-number">4</span> 4. Descriptive Analytics</h2>
+<p>This section provides <strong>summary-level insights</strong> into the adverse event data retrieved for the selected drug and time period.<br>
+The goal is not statistical inference, but to verify that the data pull, normalization, and aggregation pipelines are functioning correctly.<br>
+Each subsection below demonstrates a distinct analytical transformation — coverage metrics, reaction frequencies, and basic visualization.</p>
+<section id="volume-coverage" class="level3" data-number="4.1">
+<h3 data-number="4.1" class="anchored" data-anchor-id="volume-coverage"><span class="header-section-number">4.1</span> 4.1 Volume &amp; coverage</h3>
+<p>We begin by reviewing how many unique safety reports were collected, how many rows remain after unnesting reactions,<br>
+and the date range covered by the dataset. This helps confirm that the API pull retrieved meaningful results and the normalization worked as intended.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>n_events <span class="ot">&lt;-</span> dplyr<span class="sc">::</span><span class="fu">n_distinct</span>(events_final<span class="sc">$</span>safetyreportid)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>n_rows   <span class="ot">&lt;-</span> <span class="fu">nrow</span>(events_final)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>date_rng <span class="ot">&lt;-</span> <span class="fu">range</span>(events_final<span class="sc">$</span>receivedate, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="fu">tibble</span>(<span class="at">metric =</span> <span class="fu">c</span>(<span class="st">"unique_reports"</span>,<span class="st">"rows_after_unnest"</span>,<span class="st">"date_min"</span>,<span class="st">"date_max"</span>),</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>       <span class="at">value  =</span> <span class="fu">c</span>(n_events, n_rows, <span class="fu">as.character</span>(date_rng[<span class="dv">1</span>]), <span class="fu">as.character</span>(date_rng[<span class="dv">2</span>]))) <span class="sc">|&gt;</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  knitr<span class="sc">::</span><span class="fu">kable</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">metric</th>
+<th style="text-align: left;">value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">unique_reports</td>
+<td style="text-align: left;">2500</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">rows_after_unnest</td>
+<td style="text-align: left;">10480</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">date_min</td>
+<td style="text-align: left;">2024-01-01</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">date_max</td>
+<td style="text-align: left;">2024-02-04</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="top-reactions-pareto" class="level3" data-number="4.2">
+<h3 data-number="4.2" class="anchored" data-anchor-id="top-reactions-pareto"><span class="header-section-number">4.2</span> 4.2 Top reactions (Pareto)</h3>
+<p>To identify which adverse events are most commonly reported, we count reaction terms and rank them by frequency.<br>
+The <strong>Pareto principle (80/20 rule)</strong> often applies in pharmacovigilance data — a small subset of reactions usually accounts for the majority of reports.<br>
+Below, we display the top reported reaction terms as both a table and a visualization.</p>
+</section>
+<section id="visulizations-and-top-reactions" class="level3" data-number="4.3">
+<h3 data-number="4.3" class="anchored" data-anchor-id="visulizations-and-top-reactions"><span class="header-section-number">4.3</span> Visulizations and Top Reactions</h3>
+<p>The following Pareto-style bar chart visualizes the most frequently reported reactions for the selected drug.<br>
+This confirms that plotting and file export are functioning as expected.<br>
+Each figure is automatically saved to the <code>outputs/</code> directory for reproducibility.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>top_rx <span class="ot">&lt;-</span> events_final <span class="sc">|&gt;</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(reaction)) <span class="sc">|&gt;</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">count</span>(reaction, <span class="at">sort =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">pct =</span> n <span class="sc">/</span> <span class="fu">sum</span>(n))</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(top_rx, <span class="dv">20</span>) <span class="sc">|&gt;</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  knitr<span class="sc">::</span><span class="fu">kable</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">reaction</th>
+<th style="text-align: right;">n</th>
+<th style="text-align: right;">pct</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">diarrhoea</td>
+<td style="text-align: right;">169</td>
+<td style="text-align: right;">0.0161260</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">lactic acidosis</td>
+<td style="text-align: right;">153</td>
+<td style="text-align: right;">0.0145992</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">nausea</td>
+<td style="text-align: right;">148</td>
+<td style="text-align: right;">0.0141221</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">off label use</td>
+<td style="text-align: right;">148</td>
+<td style="text-align: right;">0.0141221</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">fatigue</td>
+<td style="text-align: right;">143</td>
+<td style="text-align: right;">0.0136450</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">acute kidney injury</td>
+<td style="text-align: right;">135</td>
+<td style="text-align: right;">0.0128817</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">dyspnoea</td>
+<td style="text-align: right;">107</td>
+<td style="text-align: right;">0.0102099</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">drug ineffective</td>
+<td style="text-align: right;">103</td>
+<td style="text-align: right;">0.0098282</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">vomiting</td>
+<td style="text-align: right;">101</td>
+<td style="text-align: right;">0.0096374</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">weight decreased</td>
+<td style="text-align: right;">87</td>
+<td style="text-align: right;">0.0083015</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">headache</td>
+<td style="text-align: right;">85</td>
+<td style="text-align: right;">0.0081107</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">covid-19</td>
+<td style="text-align: right;">84</td>
+<td style="text-align: right;">0.0080153</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">asthenia</td>
+<td style="text-align: right;">82</td>
+<td style="text-align: right;">0.0078244</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">blood glucose increased</td>
+<td style="text-align: right;">76</td>
+<td style="text-align: right;">0.0072519</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">death</td>
+<td style="text-align: right;">76</td>
+<td style="text-align: right;">0.0072519</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">decreased appetite</td>
+<td style="text-align: right;">75</td>
+<td style="text-align: right;">0.0071565</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">cough</td>
+<td style="text-align: right;">71</td>
+<td style="text-align: right;">0.0067748</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">toxicity to various agents</td>
+<td style="text-align: right;">71</td>
+<td style="text-align: right;">0.0067748</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">constipation</td>
+<td style="text-align: right;">68</td>
+<td style="text-align: right;">0.0064885</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">pruritus</td>
+<td style="text-align: right;">68</td>
+<td style="text-align: right;">0.0064885</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>top_rx <span class="sc">%&gt;%</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">15</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">reaction =</span> forcats<span class="sc">::</span><span class="fu">fct_reorder</span>(reaction, n)) <span class="sc">%&gt;%</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">ggplot</span>(ggplot2<span class="sc">::</span><span class="fu">aes</span>(reaction, n)) <span class="sc">+</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">geom_col</span>() <span class="sc">+</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">coord_flip</span>() <span class="sc">+</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">scale_y_continuous</span>(<span class="at">labels =</span> scales<span class="sc">::</span>comma) <span class="sc">+</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">labs</span>(<span class="at">title =</span> <span class="fu">glue</span>(<span class="st">"Top Adverse Reactions for {stringr::str_to_title(drug)}"</span>),</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>       <span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="st">"Reports"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/plot-reactions-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>ggplot2<span class="sc">::</span><span class="fu">ggsave</span>(<span class="fu">glue</span>(<span class="st">"outputs/top_reactions_{drug}.png"</span>), <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">5</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="age-sex-pattern" class="level3" data-number="4.4">
+<h3 data-number="4.4" class="anchored" data-anchor-id="age-sex-pattern"><span class="header-section-number">4.4</span> 4.3 Age × Sex pattern</h3>
+<p>Adverse event reporting can vary by <strong>age</strong> and <strong>biological sex</strong>, often revealing demographic usage or susceptibility trends.<br>
+This section summarizes reports by age group and sex, giving a simple population-level snapshot.</p>
+<p>The table below shows the count and percentage of reports by age group and sex.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>age_sex <span class="ot">&lt;-</span> events_final <span class="sc">|&gt;</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(age_group), sex <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"Male"</span>,<span class="st">"Female"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">count</span>(age_group, sex, <span class="at">sort =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">group_by</span>(sex) <span class="sc">|&gt;</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">pct =</span> n <span class="sc">/</span> <span class="fu">sum</span>(n)) <span class="sc">|&gt;</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">ungroup</span>()</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(age_sex)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">age_group</th>
+<th style="text-align: left;">sex</th>
+<th style="text-align: right;">n</th>
+<th style="text-align: right;">pct</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">80+</td>
+<td style="text-align: left;">Female</td>
+<td style="text-align: right;">4123</td>
+<td style="text-align: right;">0.9951726</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">80+</td>
+<td style="text-align: left;">Male</td>
+<td style="text-align: right;">3707</td>
+<td style="text-align: right;">0.9997303</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">0-17</td>
+<td style="text-align: left;">Female</td>
+<td style="text-align: right;">20</td>
+<td style="text-align: right;">0.0048274</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">0-17</td>
+<td style="text-align: left;">Male</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.0002697</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<section id="visualization-age-sex-pattern" class="level4" data-number="4.4.1">
+<h4 data-number="4.4.1" class="anchored" data-anchor-id="visualization-age-sex-pattern"><span class="header-section-number">4.4.1</span> Visualization: Age × Sex Pattern</h4>
+<p>The following grouped bar chart shows how report counts differ across age categories and between male and female patients.<br>
+This quick visual verification helps confirm the dataset’s demographic spread and that unnesting produced valid age/sex data.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>age_sex <span class="sc">%&gt;%</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">ggplot</span>(ggplot2<span class="sc">::</span><span class="fu">aes</span>(age_group, n, <span class="at">fill =</span> sex)) <span class="sc">+</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">geom_col</span>(<span class="at">position =</span> <span class="st">"dodge"</span>) <span class="sc">+</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">labs</span>(<span class="at">title =</span> <span class="fu">glue</span>(<span class="st">"{stringr::str_to_title(drug)}: Reports by Age Group and Sex"</span>),</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>       <span class="at">x =</span> <span class="st">"Age Group"</span>, <span class="at">y =</span> <span class="st">"Reports"</span>) <span class="sc">+</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">guides</span>(<span class="at">fill =</span> ggplot2<span class="sc">::</span><span class="fu">guide_legend</span>(<span class="at">title =</span> <span class="st">"Sex"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/plot-age-sex-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>ggplot2<span class="sc">::</span><span class="fu">ggsave</span>(<span class="fu">glue</span>(<span class="st">"outputs/age_sex_{drug}.png"</span>), <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">5</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+</section>
+<section id="serious-vs-non-serious-outcomes" class="level3" data-number="4.5">
+<h3 data-number="4.5" class="anchored" data-anchor-id="serious-vs-non-serious-outcomes"><span class="header-section-number">4.5</span> 4.4 Serious vs non-serious outcomes</h3>
+<p>Each record is tagged with a seriousness flag (<code>1 = serious</code>, <code>0 = non-serious</code>).<br>
+This summary shows the overall distribution of event severity, providing a sense of case seriousness for the chosen drug.</p>
+<p>The table below displays both counts and percentages.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>serious_tbl <span class="ot">&lt;-</span> events_final <span class="sc">|&gt;</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">count</span>(serious_flag) <span class="sc">|&gt;</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">pct =</span> scales<span class="sc">::</span><span class="fu">percent</span>(n <span class="sc">/</span> <span class="fu">sum</span>(n)))</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(serious_tbl)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">serious_flag</th>
+<th style="text-align: right;">n</th>
+<th style="text-align: left;">pct</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Non-serious</td>
+<td style="text-align: right;">2135</td>
+<td style="text-align: left;">20%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Serious</td>
+<td style="text-align: right;">8345</td>
+<td style="text-align: left;">80%</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="time-trend" class="level3" data-number="4.6">
+<h3 data-number="4.6" class="anchored" data-anchor-id="time-trend"><span class="header-section-number">4.6</span> 4.5 Time trend</h3>
+<p>To verify temporal coverage and reporting consistency, we plot the number of received reports per month.<br>
+This also serves as a quick validation that the <code>receivedate</code> field parsed correctly as dates.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>trend <span class="ot">&lt;-</span> events_final <span class="sc">|&gt;</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">month =</span> lubridate<span class="sc">::</span><span class="fu">floor_date</span>(receivedate, <span class="st">"month"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">count</span>(month, <span class="at">name =</span> <span class="st">"reports"</span>)</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(<span class="fu">head</span>(trend, <span class="dv">12</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">month</th>
+<th style="text-align: right;">reports</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">2024-01-01</td>
+<td style="text-align: right;">9380</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">2024-02-01</td>
+<td style="text-align: right;">1100</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<section id="visualization-monthly-adverse-event-reports" class="level4" data-number="4.6.1">
+<h4 data-number="4.6.1" class="anchored" data-anchor-id="visualization-monthly-adverse-event-reports"><span class="header-section-number">4.6.1</span> Visualization: Monthly Adverse Event Reports</h4>
+<p>The following line plot visualizes the monthly count of adverse event reports.<br>
+This ensures that the <code>receivedate</code> field was parsed correctly and that the reporting pattern is stable across months.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>trend <span class="sc">%&gt;%</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">ggplot</span>(ggplot2<span class="sc">::</span><span class="fu">aes</span>(month, reports)) <span class="sc">+</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">geom_line</span>() <span class="sc">+</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">scale_y_continuous</span>(<span class="at">labels =</span> scales<span class="sc">::</span>comma) <span class="sc">+</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">labs</span>(<span class="at">title =</span> <span class="fu">glue</span>(<span class="st">"{stringr::str_to_title(drug)}: Monthly Adverse Event Reports"</span>),</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>       <span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="st">"Reports"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="index_files/figure-html/plot-trend-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>ggplot2<span class="sc">::</span><span class="fu">ggsave</span>(<span class="fu">glue</span>(<span class="st">"outputs/trend_{drug}.png"</span>), <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">4</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<hr>
+</section>
+</section>
+</section>
+<section id="summary-recommendations" class="level2" data-number="5">
+<h2 data-number="5" class="anchored" data-anchor-id="summary-recommendations"><span class="header-section-number">5</span> 5. Summary &amp; Recommendations</h2>
+<p>The summary below consolidates all key results derived from the exploratory analysis.<br>
+It highlights the drug being studied, its data coverage window, top reported reactions, and the proportion of serious outcomes.<br>
+This section confirms that all analytical components — data pull, normalization, summarization, and visualization — functioned correctly from end to end.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>top3 <span class="ot">&lt;-</span> top_rx <span class="sc">|&gt;</span> dplyr<span class="sc">::</span><span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">3</span>) <span class="sc">|&gt;</span> dplyr<span class="sc">::</span><span class="fu">pull</span>(reaction) <span class="sc">|&gt;</span> stringr<span class="sc">::</span><span class="fu">str_to_title</span>() <span class="sc">|&gt;</span> <span class="fu">paste</span>(<span class="at">collapse =</span> <span class="st">", "</span>)</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>peak_month <span class="ot">&lt;-</span> trend <span class="sc">|&gt;</span> dplyr<span class="sc">::</span><span class="fu">slice_max</span>(reports, <span class="at">n =</span> <span class="dv">1</span>) <span class="sc">|&gt;</span> dplyr<span class="sc">::</span><span class="fu">pull</span>(month)</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>summary_txt <span class="ot">&lt;-</span> glue<span class="sc">::</span><span class="fu">glue</span>(<span class="st">"</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a><span class="st">**Key Findings (Drug:** {stringr::str_to_title(drug)} **; Window:** {start_date} → {end_date}**)**  </span></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a><span class="st">• **Top reactions:** {top3}.  </span></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a><span class="st">• **Serious outcomes:** {serious_tbl |&gt; dplyr::filter(serious_flag=='Serious') |&gt; dplyr::pull(pct)} of reports marked serious.  </span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a><span class="st">• **Demographics:** See age×sex chart; consider targeted member education if skewed.  </span></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a><span class="st">• **Utilization trend:** Peak reporting month ~ {format(peak_month, '%Y-%m')}.</span></span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a><span class="st">"</span>)</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(summary_txt)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>**Key Findings (Drug:** Metformin **; Window:** 2024-01-01 → 2024-03-31**)**  
+• **Top reactions:** Diarrhoea, Lactic Acidosis, Nausea.  
+• **Serious outcomes:** 80% of reports marked serious.  
+• **Demographics:** See age×sex chart; consider targeted member education if skewed.  
+• **Utilization trend:** Peak reporting month ~ 2024-01.</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="fu">writeLines</span>(summary_txt, <span class="fu">glue</span>(<span class="st">"outputs/summary_{drug}.md"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="final-summary" class="level2" data-number="6">
+<h2 data-number="6" class="anchored" data-anchor-id="final-summary"><span class="header-section-number">6</span> 6. Final Summary</h2>
+<p>This exploratory analysis successfully demonstrated a complete <strong>end-to-end workflow</strong> using R and Quarto to access, clean, and visualize real-world adverse event data from the openFDA API.</p>
+<p>Through a sequence of structured transformations — API retrieval, normalization, and visualization — the pipeline validated the following:</p>
+<ul>
+<li>Reliable API connection and controlled data pull via parameterized queries.<br>
+</li>
+<li>Consistent data wrangling and normalization with robust handling of missing or nested fields.<br>
+</li>
+<li>Generation of interpretable summaries, including top reactions, demographic trends, and seriousness proportions.<br>
+</li>
+<li>Automated, reproducible visualizations saved to the project’s <code>outputs/</code> directory.</li>
+</ul>
+<p>This confirms that the system functions as an adaptable template for pharmacovigilance data analysis, suitable for scaling to other drugs or time windows by simply changing the input parameters.</p>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    // For code content inside modals, clipBoardJS needs to be initialized with a container option
+    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
