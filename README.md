@@ -1,4 +1,4 @@
-# Health-Claims-EDA
+
 # Health-Claims-EDA
 
 This project demonstrates a complete exploratory data analysis (EDA) workflow using **R**, **Quarto**, and the **openFDA API** to examine adverse event reports for pharmaceutical drugs.  
